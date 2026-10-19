@@ -1,0 +1,113 @@
+// SQLite for local dev. Switch provider to "postgresql" and DATABASE_URL to deploy.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// One overdue loan account (a borrower).
+model Account {
+  id              String   @id @default(cuid())
+  name            String
+  phone           String   @unique // E.164, e.g. +919876543210
+  language        String   @default("hi") // hi | en | kn | ta | te | mr | bn
+  lenderName      String
+  loanId          String   @unique
+  product         String // "Personal loan", "Two-wheeler loan", ...
+  emiAmount       Int // rupees
+  overdueAmount   Int // rupees currently outstanding on the account
+  dueDate         DateTime
+  // Policy limits the agent may negotiate within.
+  maxInstallments Int      @default(3)
+  maxDiscountPct  Int      @default(0)
+  // NEW | CONTACTED | PROMISED | PAID | DISPUTE | CALLBACK | UNREACHABLE | WRONG_PERSON
+  status          String   @default("NEW")
+  // Behaviour segment learnt from calls: unknown | forgetful | cash_crunch | dispute | unwilling
+  segment         String   @default("unknown")
+  // Short facts the agent should remember next time (JSON array of strings).
+  memory          String   @default("[]")
+  nextActionAt    DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  calls    Call[]
+  plans    PaymentPlan[]
+  payments Payment[]
+  messages Message[]
+  events   Event[]
+}
+
+model Call {
+  id               String    @id // Bolna execution_id
+  accountId        String
+  account          Account   @relation(fields: [accountId], references: [id])
+  direction        String    @default("outbound")
+  // queued | initiated | ringing | in-progress | call-disconnected | completed | no-answer | busy | failed ...
+  status           String
+  durationSec      Int       @default(0)
+  transcript       String?
+  recordingUrl     String?
+  summary          String?
+  // paid_now | promise_to_pay | plan_agreed | dispute | callback | refused | wrong_person | no_contact
+  outcome          String?
+  sentiment        String?
+  compliancePassed Boolean?
+  complianceNotes  String? // JSON array of strings
+  cost             Float?
+  analyzedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model PaymentPlan {
+  id          String   @id @default(cuid())
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id])
+  callId      String?
+  // JSON array of { amount: number, dueDate: "YYYY-MM-DD" }
+  schedule    String
+  total       Int
+  discountPct Int      @default(0)
+  // ACTIVE | COMPLETED | BROKEN
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  payments    Payment[]
+}
+
+model Payment {
+  id        String       @id @default(cuid())
+  accountId String
+  account   Account      @relation(fields: [accountId], references: [id])
+  planId    String?
+  plan      PaymentPlan? @relation(fields: [planId], references: [id])
+  amount    Int
+  // PENDING | PAID | EXPIRED
+  status    String       @default("PENDING")
+  dueDate   DateTime?
+  paidAt    DateTime?
+  createdAt DateTime     @default(now())
+}
+
+// Outbound WhatsApp/SMS. Stored as an outbox; a provider can send them later.
+model Message {
+  id        String   @id @default(cuid())
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id])
+  channel   String   @default("whatsapp")
+  body      String
+  status    String   @default("queued") // queued | sent | failed
+  createdAt DateTime @default(now())
+}
+
+// Append-only audit log of everything that happens to an account.
+model Event {
+  id        String   @id @default(cuid())
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id])
+  type      String
+  data      String   @default("{}")
+  createdAt DateTime @default(now())
+}

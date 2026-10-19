@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Chukta: AI collections for India
 
-## Getting Started
+Voice AI agents, built on [Bolna](https://www.bolna.ai), that call borrowers in their own language, find out why they haven't paid, negotiate a plan within the lender's rules, and collect over UPI **during the call**. Every call is checked against RBI fair-practice rules.
 
-First, run the development server:
+Built for the Bolna Symphony Buildathon (submissions due 31 Oct 2026).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## How it works
+
+```
+Dashboard ──POST /api/calls──▶ compliance pre-check ──▶ Bolna /call (with account variables)
+                                                            │
+             Bolna agent "Priya" ◀── live phone call ──▶ borrower
+                    │ tool calls (custom functions)
+                    ▼
+   /api/agent/send_payment_link     → WhatsApp UPI link → /pay/:id
+   /api/agent/create_payment_plan   → validated against policy, saved, sent on WhatsApp
+   /api/agent/check_payment_status  → "payment received, thank you!"
+   /api/agent/flag_dispute | schedule_callback | mark_wrong_person
+                    │
+Bolna webhook ──▶ /api/bolna/webhook ──▶ outcome, compliance audit, memory for next call
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Path | What it is |
+|---|---|
+| `agent/prompt.md` | The agent's system prompt (Hinglish, identity check, negotiation, hard rules) |
+| `scripts/create-agent.mjs` | Creates or updates the agent on Bolna with the prompt, tools and webhook |
+| `scripts/simulate-call.mjs` | Plays a fake call against the local app, with no call credits used |
+| `src/lib/policy.ts` | Negotiation limits: number of installments, deadline, minimum first payment, discounts |
+| `src/lib/compliance.ts` | Calling-hours and attempt limits before a call; banned-phrase and disclosure checks after |
+| `src/lib/analyze.ts` | Post-call outcome, segment, memory and compliance (an LLM if `OPENAI_API_KEY` is set) |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Run it locally
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+cp .env.example .env        # then fill it in
+npx prisma migrate dev      # creates dev.db and seeds a demo portfolio
+npm run dev                 # http://localhost:3000
+npm run simulate            # optional: a fake call so the dashboard has data
+```
 
-## Learn More
+To put your own phone in the portfolio, set `DEMO_PHONE="+91XXXXXXXXXX"` (and optionally `DEMO_NAME`) in `.env`, then run `npm run db:reset`.
 
-To learn more about Next.js, take a look at the following resources:
+## Connect Bolna (real calls)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Get an API key at [platform.bolna.ai](https://platform.bolna.ai) → Developers, and put it in `.env` as `BOLNA_API_KEY`.
+2. Expose the app publicly so Bolna can reach the tools and webhook:
+   ```bash
+   ngrok http 3000
+   ```
+   Put the https URL in `.env` as `PUBLIC_BASE_URL`, then restart `npm run dev`.
+3. Create the agent:
+   ```bash
+   npm run agent:create
+   ```
+   Copy the printed `BOLNA_AGENT_ID` into `.env` and restart. After changing the prompt or the ngrok URL, run `npm run agent:create -- --update`.
+4. Open **Accounts** and press **Call** on your demo account.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+If agent creation is rejected (voice or model names change often), `agent/agent-config.generated.json` holds the full config. Build the agent in the Bolna dashboard instead and paste the prompt and custom functions from it.
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Not built yet
+- Real WhatsApp sending (messages are stored in an outbox and shown on the account page)
+- A real UPI gateway (Razorpay or Cashfree payment links plus their webhook replace `/api/pay/:id`)
+- CSV import of a lender's portfolio, and automatic follow-up calls on promised dates
