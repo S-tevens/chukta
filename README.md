@@ -1,4 +1,4 @@
-# Chukta: AI collections for India
+# Settlr: AI collections for India
 
 Voice AI agents, built on [Bolna](https://www.bolna.ai), that call borrowers in their own language, find out why they haven't paid, negotiate a plan within the lender's rules, and collect over UPI **during the call**. Every call is checked against RBI fair-practice rules.
 

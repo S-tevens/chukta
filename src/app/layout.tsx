@@ -6,7 +6,7 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Chukta — AI collections for India",
+  title: "Settlr — AI collections for India",
   description: "Voice AI agents that call, negotiate and collect overdue payments in Indian languages, within RBI rules.",
 };
 

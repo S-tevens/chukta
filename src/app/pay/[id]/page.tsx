@@ -14,7 +14,7 @@ export default async function PayPage({ params }: { params: Promise<{ id: string
   const a = payment.account;
 
   const upi = new URL("upi://pay");
-  upi.searchParams.set("pa", process.env.UPI_VPA ?? "chukta@upi");
+  upi.searchParams.set("pa", process.env.UPI_VPA ?? "settlr@upi");
   upi.searchParams.set("pn", a.lenderName);
   upi.searchParams.set("am", payment.amount.toFixed(2));
   upi.searchParams.set("cu", "INR");

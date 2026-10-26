@@ -11,7 +11,7 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
         <div className="mx-auto flex max-w-7xl items-center gap-8 px-4 py-3 sm:px-6">
           <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
             <span className="grid h-7 w-7 place-items-center rounded-md bg-brand text-sm text-white">₹</span>
-            Chukta
+            Settlr
           </Link>
           <nav className="flex gap-1 text-sm">
             {nav.map((n) => (

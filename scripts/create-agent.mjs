@@ -1,4 +1,4 @@
-// Creates (or updates) the Chukta collections agent on Bolna.
+// Creates (or updates) the Settlr collections agent on Bolna.
 //   npm run agent:create                 create a new agent, prints its ID
 //   npm run agent:create -- --update     update the agent in BOLNA_AGENT_ID
 //   npm run agent:create -- --dry-run    only write agent/agent-config.generated.json
@@ -78,7 +78,7 @@ for (const [name, [description, extra, preCall]] of Object.entries(toolDefs)) {
 
 const config = {
   agent_config: {
-    agent_name: "Chukta Collections (Priya)",
+    agent_name: "Settlr Collections (Priya)",
     agent_welcome_message: "Namaste! Kya meri baat {first_name} ji se ho rahi hai?",
     webhook_url: `${base}/api/bolna/webhook?token=${AGENT_TOOL_TOKEN}`,
     agent_type: "other",
@@ -94,7 +94,7 @@ const config = {
           },
           synthesizer: {
             provider: "sarvam",
-            provider_config: { voice: "Priya", voice_id: "priya", model: "bulbul:v3", language: "hi" },
+            provider_config: { voice: "Priya (Recovery)", voice_id: "priya_hi_recovery", model: "bulbul:v4-flash", language: "hi" },
             stream: true,
             buffer_size: 250,
             audio_format: "wav",
