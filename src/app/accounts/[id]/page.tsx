@@ -181,7 +181,7 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
                   {a.messages.map((m) => (
                     <li key={m.id} className="rounded-lg rounded-tl-none bg-[#dcf8c6] px-3 py-2 text-sm text-stone-800">
                       <p className="whitespace-pre-line break-words">{m.body}</p>
-                      <p className="mt-1 text-right text-[10px] text-stone-500">{formatDateTime(m.createdAt)}</p>
+                      <p className="mt-1 text-right text-[10px] text-stone-500">{formatDateTime(m.createdAt)}{m.status === "sent" ? " ✓✓" : m.status === "failed" ? " · not delivered" : ""}</p>
                     </li>
                   ))}
                 </ul>

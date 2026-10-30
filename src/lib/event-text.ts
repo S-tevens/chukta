@@ -14,7 +14,9 @@ const EVENT_TEXT: Record<string, (d: Record<string, unknown>) => string> = {
   "dispute.flagged": (d) => `Dispute flagged${d.reason ? `: ${d.reason}` : ""}`,
   "callback.scheduled": (d) => `Callback scheduled${d.reason ? ` (${d.reason})` : ""}`,
   "contact.wrong_person": () => "Wrong person answered",
-  "message.queued": () => "WhatsApp message sent",
+  "message.queued": () => "WhatsApp message queued",
+  "message.sent": () => "WhatsApp message delivered to Twilio",
+  "message.failed": (d) => `WhatsApp message failed${d.error ? `: ${d.error}` : ""}`,
 };
 
 export function eventText(type: string, data: string) {
