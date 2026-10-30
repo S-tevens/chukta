@@ -82,6 +82,7 @@ const config = {
     agent_welcome_message: "Namaste! Kya meri baat {first_name} ji se ho rahi hai?",
     webhook_url: `${base}/api/bolna/webhook?token=${AGENT_TOOL_TOKEN}`,
     agent_type: "other",
+    call_summary_enabled: true,
     tasks: [
       {
         task_type: "conversation",
@@ -90,7 +91,7 @@ const config = {
           llm_agent: {
             agent_type: "simple_llm_agent",
             agent_flow_type: "streaming",
-            llm_config: { provider: "openai", model: "gpt-4.1-mini", max_tokens: 200, temperature: 0.3 },
+            llm_config: { provider: "openai", model: "gpt-4.1-mini", max_tokens: 150, temperature: 0.3 },
           },
           synthesizer: {
             provider: "sarvam",
@@ -104,7 +105,21 @@ const config = {
           output: { provider: "plivo", format: "wav" },
           api_tools: { tools, tools_params: toolsParams },
         },
-        task_config: { hangup_after_silence: 15, call_terminate: 420 },
+        task_config: {
+          // Long enough for the borrower to pay in their UPI app while staying on the line.
+          hangup_after_silence: 40,
+          call_terminate: 420,
+          optimize_latency: true,
+          incremental_delay: 600,
+          check_if_user_online: true,
+          check_user_online_message: "Hello, kya aap line par hain?",
+          trigger_user_online_message_after: 15,
+          call_hangup_message: "Dhanyavaad, aapka din shubh ho. Namaste!",
+          // Hang up once the agent has said goodbye instead of waiting on silence.
+          hangup_after_LLMCall: true,
+          call_cancellation_prompt:
+            "Return true only if the agent has already said its final goodbye (Dhanyavaad ... Namaste) and the borrower has nothing more to add. Return false while a payment is in progress or a question is open.",
+        },
       },
     ],
   },

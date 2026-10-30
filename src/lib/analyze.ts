@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { logEvent } from "./events";
 import { ruleBasedCompliance } from "./compliance";
-import { parseJson } from "./format";
+import { formatDateTime, parseJson, rupees } from "./format";
 
 const NO_CONTACT = new Set(["no-answer", "busy", "failed", "canceled", "error", "balance-low", "stopped"]);
 
@@ -46,6 +46,21 @@ async function llmAnalysis(transcript: string): Promise<LlmAnalysis | null> {
   return parseJson<LlmAnalysis | null>(data.choices?.[0]?.message?.content, null);
 }
 
+/** Plain-English summary from the actions taken during the call, used when no LLM summary exists. */
+function summaryFromEvents(events: { type: string; data: string }[], firstName: string) {
+  const parts: string[] = [];
+  for (const e of events) {
+    const d = parseJson<Record<string, unknown>>(e.data, {});
+    if (e.type === "payment.link_sent") parts.push(`${firstName} agreed to pay ${rupees(Number(d.amount))} and got a UPI link on WhatsApp.`);
+    else if (e.type === "payment.received") parts.push(`${rupees(Number(d.amount))} was paid during the call.`);
+    else if (e.type === "plan.created") parts.push("A payment plan for the rest was agreed and sent on WhatsApp.");
+    else if (e.type === "dispute.flagged") parts.push(`${firstName} disputed the loan${d.reason ? ` (${d.reason})` : ""}; it was sent to the team for review.`);
+    else if (e.type === "callback.scheduled") parts.push(`A callback was booked${d.when ? ` for ${formatDateTime(new Date(String(d.when)))}` : ""}.`);
+    else if (e.type === "contact.wrong_person") parts.push("Someone else answered, so no loan details were shared.");
+  }
+  return parts.length ? parts.join(" ") : null;
+}
+
 /** Runs once per finished call: decides the outcome, checks compliance and updates the account. */
 export async function analyzeCall(callId: string) {
   const call = await db.call.findUnique({ where: { id: callId }, include: { account: true } });
@@ -63,7 +78,7 @@ export async function analyzeCall(callId: string) {
   }
 
   // Tool calls made during the call are the most reliable record of what was agreed.
-  const during = await db.event.findMany({ where: { accountId: account.id, createdAt: { gte: call.createdAt } } });
+  const during = await db.event.findMany({ where: { accountId: account.id, createdAt: { gte: call.createdAt } }, orderBy: { createdAt: "asc" } });
   const types = new Set(during.map((e) => e.type));
   const transcript = call.transcript ?? "";
   const llm = transcript ? await llmAnalysis(transcript) : null;
@@ -85,7 +100,7 @@ export async function analyzeCall(callId: string) {
     where: { id: callId },
     data: {
       outcome,
-      summary: llm?.summary ?? call.summary,
+      summary: llm?.summary ?? call.summary ?? summaryFromEvents(during, account.name.split(" ")[0]),
       sentiment: llm?.sentiment ?? null,
       compliancePassed: complianceNotes.length === 0,
       complianceNotes: JSON.stringify(complianceNotes),

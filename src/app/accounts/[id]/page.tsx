@@ -2,13 +2,18 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { CallButton } from "@/components/call-button";
+import { Elapsed } from "@/components/elapsed";
 import { Card, Empty, Shell, StatusBadge, outcomeLabel } from "@/components/ui";
 import { db } from "@/lib/db";
 import { eventText } from "@/lib/event-text";
+import { paymentLink } from "@/lib/events";
 import { daysPastDue, formatDate, formatDateTime, parseJson, rupees } from "@/lib/format";
 import { policyFor, type Installment } from "@/lib/policy";
 
 export const dynamic = "force-dynamic";
+
+const LIVE = ["queued", "initiated", "ringing", "in-progress"];
+const LIVE_LABEL: Record<string, string> = { queued: "Dialling", initiated: "Dialling", ringing: "Ringing", "in-progress": "On the call" };
 
 export default async function AccountPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -27,6 +32,13 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
   const p = policyFor(a);
   const memory = parseJson<string[]>(a.memory, []);
   const plan = a.plans.find((x) => x.status === "ACTIVE");
+  const liveCall = a.calls.find((c) => LIVE.includes(c.status));
+  const liveEvents = liveCall ? a.events.filter((e) => e.createdAt >= liveCall.createdAt && !["call.started", "message.queued"].includes(e.type)).reverse() : [];
+  const firstName = a.name.split(" ")[0];
+  const waLink = (paymentId: string, amount: number) =>
+    `https://wa.me/${a.phone.replace(/\D/g, "")}?text=${encodeURIComponent(
+      `Hi ${firstName}, here is your secure UPI payment link for ${rupees(amount)} towards ${a.lenderName} loan ${a.loanId}: ${paymentLink(paymentId)}`,
+    )}`;
 
   return (
     <Shell active="accounts">
@@ -44,8 +56,36 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
             {a.lenderName} · {a.product} · {a.loanId} · {a.phone.replace(/(\+91)(\d{5})(\d{5})/, "$1 $2 $3")}
           </p>
         </div>
-        {!["PAID", "DISPUTE", "WRONG_PERSON"].includes(a.status) && <CallButton accountIds={[a.id]} label="Call now" />}
+        {!liveCall && !["PAID", "DISPUTE", "WRONG_PERSON"].includes(a.status) && <CallButton accountIds={[a.id]} label="Call now" />}
       </div>
+
+      {liveCall && (
+        <section className="mb-4 rounded-xl border border-brand/30 bg-brand-soft p-4">
+          <div className="flex items-center gap-3">
+            <span className="relative flex h-3 w-3">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-60" />
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-brand" />
+            </span>
+            <span className="font-semibold text-brand">{LIVE_LABEL[liveCall.status] ?? liveCall.status}</span>
+            <span className="text-sm text-muted">Priya (AI agent) · {a.phone.replace(/(\+91)(\d{5})(\d{5})/, "$1 $2 $3")}</span>
+            <span className="ml-auto text-lg font-semibold text-brand">
+              <Elapsed since={liveCall.createdAt.toISOString()} />
+            </span>
+          </div>
+          {liveEvents.length > 0 ? (
+            <ol className="mt-3 space-y-1.5 border-l-2 border-brand/30 pl-4 text-sm">
+              {liveEvents.map((e) => (
+                <li key={e.id}>
+                  <span className="mr-2 text-xs text-muted">{formatDateTime(e.createdAt).split(", ").pop()}</span>
+                  {eventText(e.type, e.data)}
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="mt-2 text-sm text-muted">Agent actions appear here as they happen.</p>
+          )}
+        </section>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4">
@@ -71,6 +111,33 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
               )}
             </dl>
           </Card>
+
+          {a.payments.length > 0 && (
+            <Card title="UPI payment links">
+              <ul className="space-y-3 text-sm">
+                {a.payments.map((pay) => (
+                  <li key={pay.id}>
+                    <div className="flex justify-between">
+                      <span className="num font-medium">{rupees(pay.amount)}</span>
+                      <span className={pay.status === "PAID" ? "text-emerald-700" : "text-muted"}>
+                        {pay.status === "PAID" ? `✓ paid ${pay.paidAt ? formatDateTime(pay.paidAt) : ""}` : pay.dueDate ? `due ${formatDate(pay.dueDate)}` : "pending"}
+                      </span>
+                    </div>
+                    {pay.status !== "PAID" && (
+                      <div className="mt-1 flex gap-3 text-xs">
+                        <a href={waLink(pay.id, pay.amount)} target="_blank" rel="noreferrer" className="font-medium text-brand hover:underline">
+                          Send on WhatsApp ↗
+                        </a>
+                        <a href={`/pay/${pay.id}`} target="_blank" className="text-muted hover:text-foreground">
+                          Open link
+                        </a>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
 
           <Card title="Agent's negotiation limits">
             <ul className="space-y-1 text-sm text-muted">
