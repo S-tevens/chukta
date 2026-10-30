@@ -13,8 +13,13 @@ export default async function PayPage({ params }: { params: Promise<{ id: string
   if (!payment) notFound();
   const a = payment.account;
 
+  // Real UPI QR and app links only when explicitly switched on with a UPI ID you own.
+  // Otherwise the page is demo-only, so nobody can send money to a placeholder UPI ID.
+  const live = process.env.UPI_LIVE === "true" && Boolean(process.env.UPI_VPA);
+  if (!live) return <DemoPay paymentId={payment.id} paid={payment.status === "PAID"} lender={a.lenderName} who={`${a.name.split(" ")[0]} · Loan ${a.loanId}`} amount={payment.amount} />;
+
   const upi = new URL("upi://pay");
-  upi.searchParams.set("pa", process.env.UPI_VPA ?? "settlr@upi");
+  upi.searchParams.set("pa", process.env.UPI_VPA!);
   upi.searchParams.set("pn", a.lenderName);
   upi.searchParams.set("am", payment.amount.toFixed(2));
   upi.searchParams.set("cu", "INR");
@@ -57,6 +62,37 @@ export default async function PayPage({ params }: { params: Promise<{ id: string
           <p className="mt-6 text-[11px] leading-relaxed text-muted">
             Never share your UPI PIN or OTP with anyone, including callers from {a.lenderName}.
           </p>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function DemoPay({ paymentId, paid, lender, who, amount }: { paymentId: string; paid: boolean; lender: string; who: string; amount: number }) {
+  return (
+    <main className="flex min-h-screen items-start justify-center px-4 py-10">
+      <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
+        <div className="bg-brand px-5 py-4 text-white">
+          <p className="text-xs opacity-80">Secure payment to</p>
+          <p className="text-lg font-semibold">{lender}</p>
+        </div>
+        <div className="px-5 py-6 text-center">
+          <p className="text-sm text-muted">{who}</p>
+          <p className="num mt-1 text-4xl font-semibold tracking-tight">{rupees(amount)}</p>
+          {paid ? (
+            <div className="mt-6 rounded-xl bg-emerald-50 px-4 py-6 text-emerald-800">
+              <p className="text-3xl">✓</p>
+              <p className="mt-1 font-medium">Payment received</p>
+              <p className="text-sm">Thank you! Your lender has been updated.</p>
+            </div>
+          ) : (
+            <>
+              <p className="mt-5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Demo mode: no real money is charged.
+              </p>
+              <PayButton paymentId={paymentId} label={`Pay ${rupees(amount)} with UPI`} primary />
+            </>
+          )}
         </div>
       </div>
     </main>
