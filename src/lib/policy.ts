@@ -35,6 +35,7 @@ export function validatePlan(account: Account, schedule: Installment[], discount
   const owed = Math.round(account.overdueAmount * (1 - discountPct / 100));
   const total = schedule.reduce((s, i) => s + i.amount, 0);
   if (total < owed) errors.push(`The installments add up to ₹${total}, but ₹${owed} is owed.`);
+  if (total > owed) errors.push(`The installments add up to ₹${total}, but only ₹${owed} is left to pay.`);
   for (const [n, inst] of schedule.entries()) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(inst.dueDate)) errors.push(`Installment ${n + 1} needs a date as YYYY-MM-DD.`);
     else if (inst.dueDate < today) errors.push(`Installment ${n + 1} is dated in the past.`);

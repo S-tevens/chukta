@@ -47,7 +47,10 @@ export function ruleBasedCompliance(transcript: string) {
   for (const phrase of BANNED) {
     if (agentLines.includes(phrase)) notes.push(`Agent used a prohibited phrase: "${phrase.trim()}"`);
   }
-  const disclosed = /\b(ai|digital assistant|virtual assistant|recorded|record)\b|रिकॉर्ड|एआई/.test(agentLines);
-  if (agentLines && !disclosed) notes.push("No AI / call-recording disclosure found");
+  // Both disclosures are required: that the caller is an AI, and that the call is recorded.
+  const saidAi = /\b(ai|digital assistant|virtual assistant)\b|एआई/.test(agentLines);
+  const saidRecorded = /\b(recorded|record|recording)\b|रिकॉर्ड/.test(agentLines);
+  if (agentLines && !saidAi) notes.push("Agent did not disclose that it is an AI");
+  if (agentLines && !saidRecorded) notes.push("Agent did not disclose that the call is recorded");
   return { passed: notes.length === 0, notes };
 }

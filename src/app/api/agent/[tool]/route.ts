@@ -11,6 +11,21 @@ import { policyFor, validatePlan, type Installment } from "@/lib/policy";
 type Args = Record<string, string>;
 
 const last4 = (a: Account) => a.phone.slice(-4);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Unpaid one-off payment links from the last two hours: money already agreed on this call. */
+async function pendingLinkTotal(accountId: string) {
+  const since = new Date(Date.now() - 2 * 3_600_000);
+  const links = await db.payment.findMany({ where: { accountId, planId: null, status: "PENDING", createdAt: { gte: since } } });
+  return links.reduce((s, p) => s + p.amount, 0);
+}
+
+/** True if a one-off payment link was paid in the last two hours (a part payment on this call). */
+async function paidOneOffRecently(accountId: string) {
+  const since = new Date(Date.now() - 2 * 3_600_000);
+  return (await db.payment.count({ where: { accountId, planId: null, status: "PAID", paidAt: { gte: since } } })) > 0;
+}
+
 const noonIST = (isoDate: string) => new Date(`${isoDate}T12:00:00+05:30`);
 
 async function lookupAccount(_args: Args, a: Account) {
@@ -36,8 +51,9 @@ async function lookupAccount(_args: Args, a: Account) {
 
 async function sendPaymentLink(args: Args, a: Account) {
   const amount = parseInt(args.amount?.replace(/[^\d]/g, "") || "", 10) || a.overdueAmount;
-  if (amount > a.overdueAmount) {
-    return { ok: false, message: `The most they owe is ${a.overdueAmount} rupees. Use that amount or less.` };
+  const open = a.overdueAmount - (await pendingLinkTotal(a.id));
+  if (amount > open) {
+    return { ok: false, message: `The most they can pay now is ${open} rupees. Use that amount or less.` };
   }
   const payment = await db.payment.create({ data: { accountId: a.id, amount } });
   await queueWhatsApp(
@@ -48,7 +64,9 @@ async function sendPaymentLink(args: Args, a: Account) {
   return {
     ok: true,
     payment_id: payment.id,
-    message: `A UPI payment link for ${amount} rupees was sent on WhatsApp to the number ending ${last4(a)}. Ask them to open it and pay now while you stay on the line, then use check_payment_status.`,
+    message:
+      `A UPI payment link for ${amount} rupees was sent on WhatsApp to the number ending ${last4(a)}. Ask them to open it and pay now while you stay on the line, then use check_payment_status.` +
+      (open - amount > 0 ? ` After this payment, ${open - amount} rupees will remain. Any payment plan is only for these ${open - amount} rupees.` : " This clears the full overdue amount."),
   };
 }
 
@@ -68,7 +86,8 @@ function parsePlan(text: string): Installment[] {
 async function createPaymentPlan(args: Args, a: Account) {
   const schedule = parsePlan(args.plan ?? "");
   const discountPct = parseInt(args.discount_pct || "0", 10) || 0;
-  const check = validatePlan(a, schedule, discountPct);
+  const alreadyAgreed = await pendingLinkTotal(a.id);
+  const check = validatePlan({ ...a, overdueAmount: a.overdueAmount - alreadyAgreed }, schedule, discountPct);
   if (!check.ok) {
     const p = check.policy;
     return {
@@ -92,7 +111,7 @@ async function createPaymentPlan(args: Args, a: Account) {
     },
     include: { payments: { orderBy: { dueDate: "asc" } } },
   });
-  if (discountPct > 0) await db.account.update({ where: { id: a.id }, data: { overdueAmount: check.owed } });
+  if (discountPct > 0) await db.account.update({ where: { id: a.id }, data: { overdueAmount: check.owed + alreadyAgreed } });
   await db.account.update({
     where: { id: a.id },
     data: { status: "PROMISED", nextActionAt: noonIST(schedule[0].dueDate) },
@@ -110,16 +129,22 @@ async function createPaymentPlan(args: Args, a: Account) {
   return {
     ok: true,
     plan_id: plan.id,
-    message: `Plan saved and confirmation sent on WhatsApp with a link for the first payment of ${first.amount} rupees. Read the dates back to them once, and ask if they can pay the first one now.`,
+    message: alreadyAgreed || (await paidOneOffRecently(a.id))
+      ? `Plan saved and sent on WhatsApp. Read the dates and amounts back to them once, then close the call.`
+      : `Plan saved and confirmation sent on WhatsApp with a link for the first payment of ${first.amount} rupees. Read the dates back to them once, and ask if they can pay the first one now.`,
   };
 }
 
 async function checkPaymentStatus(_args: Args, a: Account) {
   const since = new Date(Date.now() - 60 * 60_000);
-  const paid = await db.payment.findFirst({
-    where: { accountId: a.id, status: "PAID", paidAt: { gte: since } },
-    orderBy: { paidAt: "desc" },
-  });
+  const findPaid = () =>
+    db.payment.findFirst({ where: { accountId: a.id, status: "PAID", paidAt: { gte: since } }, orderBy: { paidAt: "desc" } });
+  // The borrower often says "done" a few seconds before UPI confirms, so wait briefly.
+  let paid = await findPaid();
+  for (let i = 0; !paid && i < 8; i++) {
+    await sleep(1500);
+    paid = await findPaid();
+  }
   if (paid) {
     const fresh = await db.account.findUniqueOrThrow({ where: { id: a.id } });
     return {
