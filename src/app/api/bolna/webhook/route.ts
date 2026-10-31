@@ -5,6 +5,9 @@ import { analyzeCall } from "@/lib/analyze";
 import { db } from "@/lib/db";
 import { logEvent } from "@/lib/events";
 
+// Post-call analysis can call an LLM.
+export const maxDuration = 30;
+
 type Execution = {
   id?: string;
   execution_id?: string;

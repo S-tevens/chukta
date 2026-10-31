@@ -1,8 +1,8 @@
-// Plays a fake call against the local app, the way Bolna would: tool calls, then webhooks.
+// Plays a fake call against the app (local, or SIM_BASE_URL), the way Bolna would: tool calls, then webhooks.
 // Useful for building the dashboard without spending call credits.
 //   npm run simulate                   uses the first NEW account
 //   npm run simulate -- <account_id>   uses that account
-const base = "http://localhost:3000";
+const base = process.env.SIM_BASE_URL ?? "http://localhost:3000";
 const token = process.env.AGENT_TOOL_TOKEN;
 const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

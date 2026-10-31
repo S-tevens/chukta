@@ -34,7 +34,8 @@ Bolna webhook ──▶ /api/bolna/webhook ──▶ outcome, compliance audit, 
 ```bash
 npm install
 cp .env.example .env        # then fill it in
-npx prisma migrate dev      # creates dev.db and seeds a demo portfolio
+npx prisma migrate deploy   # creates the tables in the Postgres database in DATABASE_URL
+npm run db:seed             # loads a demo portfolio
 npm run dev                 # http://localhost:3000
 npm run simulate            # optional: a fake call so the dashboard has data
 ```

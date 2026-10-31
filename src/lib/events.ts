@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { db } from "./db";
 
 export async function logEvent(accountId: string, type: string, data: Record<string, unknown> = {}) {
@@ -15,12 +16,12 @@ export function whatsAppConfigured() {
 
 /**
  * Queue a WhatsApp message in the outbox. When Twilio is configured it is also sent,
- * in the background so the agent tool replies to Bolna without waiting.
+ * after the response (also on serverless) so the agent tool replies to Bolna without waiting.
  */
 export async function queueWhatsApp(accountId: string, body: string) {
   const msg = await db.message.create({ data: { accountId, body, channel: "whatsapp" } });
   await logEvent(accountId, "message.queued", { messageId: msg.id, channel: "whatsapp" });
-  if (whatsAppConfigured()) void deliverWhatsApp(msg.id);
+  if (whatsAppConfigured()) after(() => deliverWhatsApp(msg.id));
   return msg;
 }
 

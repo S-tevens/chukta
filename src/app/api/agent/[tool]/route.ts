@@ -8,6 +8,9 @@ import { logEvent, paymentLink, queueWhatsApp } from "@/lib/events";
 import { daysPastDue, formatDate, parseJson, rupees } from "@/lib/format";
 import { policyFor, validatePlan, type Installment } from "@/lib/policy";
 
+// check_payment_status waits up to ~12s for UPI to confirm.
+export const maxDuration = 30;
+
 type Args = Record<string, string>;
 
 const last4 = (a: Account) => a.phone.slice(-4);
