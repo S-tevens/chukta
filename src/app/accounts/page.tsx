@@ -25,6 +25,7 @@ export default async function AccountsPage() {
       bucket: dpdBucket(dpd),
       status: a.status,
       segment: a.segment,
+      callable: a.callable,
       lastOutcome: a.calls[0]?.outcome ?? null,
       nextAction: a.nextActionAt ? formatDateTime(a.nextActionAt) : null,
     };

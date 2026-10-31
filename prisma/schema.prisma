@@ -24,6 +24,8 @@ model Account {
   // Policy limits the agent may negotiate within.
   maxInstallments Int      @default(3)
   maxDiscountPct  Int      @default(0)
+  // True for real numbers a visitor entered (or DEMO_PHONE). Seeded accounts have made-up numbers and are never dialled.
+  callable        Boolean  @default(false)
   // NEW | CONTACTED | PROMISED | PAID | DISPUTE | CALLBACK | UNREACHABLE | WRONG_PERSON
   status          String   @default("NEW")
   // Behaviour segment learnt from calls: unknown | forgetful | cash_crunch | dispute | unwilling

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { TryCall } from "@/components/try-call";
 import { Card, Empty, Shell, Stat, outcomeLabel } from "@/components/ui";
 import { bolnaConfigured } from "@/lib/bolna";
 import { db } from "@/lib/db";
@@ -57,9 +58,7 @@ export default async function Overview() {
           <h1 className="text-2xl font-semibold tracking-tight">Collections overview</h1>
           <p className="text-sm text-muted">AI agents calling, negotiating and collecting, live.</p>
         </div>
-        <Link href="/accounts" className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:opacity-90">
-          Start calling →
-        </Link>
+        <TryCall />
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">

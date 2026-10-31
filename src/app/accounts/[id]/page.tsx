@@ -6,7 +6,6 @@ import { Elapsed } from "@/components/elapsed";
 import { Card, Empty, Shell, StatusBadge, outcomeLabel } from "@/components/ui";
 import { db } from "@/lib/db";
 import { eventText } from "@/lib/event-text";
-import { paymentLink } from "@/lib/events";
 import { daysPastDue, formatDate, formatDateTime, parseJson, rupees } from "@/lib/format";
 import { policyFor, type Installment } from "@/lib/policy";
 
@@ -34,11 +33,8 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
   const plan = a.plans.find((x) => x.status === "ACTIVE");
   const liveCall = a.calls.find((c) => LIVE.includes(c.status));
   const liveEvents = liveCall ? a.events.filter((e) => e.createdAt >= liveCall.createdAt && !["call.started", "message.queued"].includes(e.type)).reverse() : [];
-  const firstName = a.name.split(" ")[0];
-  const waLink = (paymentId: string, amount: number) =>
-    `https://wa.me/${a.phone.replace(/\D/g, "")}?text=${encodeURIComponent(
-      `Hi ${firstName}, here is your secure UPI payment link for ${rupees(amount)} towards ${a.lenderName} loan ${a.loanId}: ${paymentLink(paymentId)}`,
-    )}`;
+  // The dashboard is public, so never show the full number.
+  const maskedPhone = `+91 ••••• •${a.phone.slice(-4)}`;
 
   return (
     <Shell active="accounts">
@@ -53,10 +49,10 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
             <StatusBadge status={a.status} />
           </div>
           <p className="text-sm text-muted">
-            {a.lenderName} · {a.product} · {a.loanId} · {a.phone.replace(/(\+91)(\d{5})(\d{5})/, "$1 $2 $3")}
+            {a.lenderName} · {a.product} · {a.loanId} · {maskedPhone}
           </p>
         </div>
-        {!liveCall && !["PAID", "DISPUTE", "WRONG_PERSON"].includes(a.status) && <CallButton accountIds={[a.id]} label="Call now" />}
+        {a.callable && !liveCall && !["PAID", "DISPUTE", "WRONG_PERSON"].includes(a.status) && <CallButton accountIds={[a.id]} label="Call now" />}
       </div>
 
       {liveCall && (
@@ -67,7 +63,7 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
               <span className="relative inline-flex h-3 w-3 rounded-full bg-brand" />
             </span>
             <span className="font-semibold text-brand">{LIVE_LABEL[liveCall.status] ?? liveCall.status}</span>
-            <span className="text-sm text-muted">Priya (AI agent) · {a.phone.replace(/(\+91)(\d{5})(\d{5})/, "$1 $2 $3")}</span>
+            <span className="text-sm text-muted">Priya (AI agent) · {maskedPhone}</span>
             <span className="ml-auto text-lg font-semibold text-brand">
               <Elapsed since={liveCall.createdAt.toISOString()} />
             </span>
@@ -125,9 +121,6 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
                     </div>
                     {pay.status !== "PAID" && (
                       <div className="mt-1 flex gap-3 text-xs">
-                        <a href={waLink(pay.id, pay.amount)} target="_blank" rel="noreferrer" className="font-medium text-brand hover:underline">
-                          Send on WhatsApp ↗
-                        </a>
                         <a href={`/pay/${pay.id}`} target="_blank" className="text-muted hover:text-foreground">
                           Open link
                         </a>

@@ -41,6 +41,7 @@ async function main() {
     dueDate: daysAgo(b.dpd),
     maxInstallments: b.overdue > 10000 ? 3 : 2,
     maxDiscountPct: b.dpd >= 60 ? 15 : 0,
+    callable: false,
   }));
 
   const demoPhone = process.env.DEMO_PHONE?.trim();
@@ -51,6 +52,7 @@ async function main() {
       language: "hi",
       lenderName: "Kaveri Finance",
       loanId: "KF-DEMO01",
+      callable: true,
       product: "Personal loan",
       emiAmount: 4500,
       overdueAmount: 9000,

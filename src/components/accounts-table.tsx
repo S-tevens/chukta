@@ -15,6 +15,7 @@ export type AccountRow = {
   dpd: number;
   bucket: string;
   status: string;
+  callable: boolean;
   segment: string;
   lastOutcome: string | null;
   nextAction: string | null;
@@ -26,7 +27,7 @@ export function AccountsTable({ rows }: { rows: AccountRow[] }) {
   const [filter, setFilter] = useState("All");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const visible = useMemo(() => rows.filter((r) => filter === "All" || r.bucket === filter), [rows, filter]);
-  const callable = visible.filter((r) => !["PAID", "DISPUTE", "WRONG_PERSON"].includes(r.status));
+  const callable = visible.filter((r) => r.callable && !["PAID", "DISPUTE", "WRONG_PERSON"].includes(r.status));
 
   const toggle = (id: string) =>
     setSelected((s) => {
@@ -99,7 +100,7 @@ export function AccountsTable({ rows }: { rows: AccountRow[] }) {
                   {r.nextAction && <div className="text-xs">Next: {r.nextAction}</div>}
                 </td>
                 <td className="py-2 pr-4 text-right">
-                  {!["PAID", "DISPUTE", "WRONG_PERSON"].includes(r.status) && <CallButton accountIds={[r.id]} variant="ghost" />}
+                  {r.callable && !["PAID", "DISPUTE", "WRONG_PERSON"].includes(r.status) && <CallButton accountIds={[r.id]} variant="ghost" />}
                 </td>
               </tr>
             ))}
